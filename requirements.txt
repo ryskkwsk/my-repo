@@ -1,0 +1,11 @@
+# Core
+pandas>=2.0
+numpy>=1.24
+python-dotenv>=1.0
+
+# OANDA v20 API (live/demo trading & data fetch)
+oandapyV20>=0.7.2
+requests>=2.31  # oandapyV20 の依存
+
+# Dev / test
+pytest>=7.4

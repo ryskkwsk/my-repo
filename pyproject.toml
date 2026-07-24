@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fx-bot"
+version = "0.1.0"
+description = "FX 自動売買ツール（OANDA v20 / デモ口座向け）"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "python-dotenv>=1.0",
+    "oandapyV20>=0.7.2",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[tool.setuptools.packages.find]
+include = ["fx_bot*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

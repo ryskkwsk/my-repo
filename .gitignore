@@ -1,0 +1,15 @@
+# 認証情報（絶対にコミットしない）
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# データキャッシュ・ログ
+data/cache/*.csv
+logs/
+*.log
