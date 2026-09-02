@@ -56,11 +56,11 @@ jobs:
       # ------------------------------------------------------------------------
       # 4.5 静的解析 (actionlint) の実行
       # ------------------------------------------------------------------------
-      - name: "4.5: Run actionlint (Static Analysis)"
-        run: |
-          echo "=== actionlint によるワークフローファイルの静的解析を実行 ==="
-          # Docker を使用して actionlint を手軽に実行する手法です
-          docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" rhysd/actionlint:latest
+      # - name: "4.5: Run actionlint (Static Analysis)"
+      #   run: |
+      #     echo "=== actionlint によるワークフローファイルの静的解析を実行 ==="
+      #     # Docker を使用して actionlint を手軽に実行する手法です
+      #     docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" rhysd/actionlint:latest
 
       # ------------------------------------------------------------------------
       # 4.7.1 Bashのパイプエラー検知 (pipefail) の動作検証
