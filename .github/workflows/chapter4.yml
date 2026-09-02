@@ -1,0 +1,89 @@
+# ==============================================================================
+# 第4章: 継続的インテグレーションの実践 検証用ワークフロー
+# ==============================================================================
+name: Chapter 4 Practice CI
+
+on:
+  push:
+    branches: [main]
+  # 4.1.3 & 4.3 プルリクエストの起動とフィルタリング
+  pull_request:
+    # 4.3.2 Glob パターンによる起動制限
+    # Goの関連コード、またはこのワークフロー定義自体が変更されたときのみ起動
+    paths:
+      - 'go/**/*.go'
+      - '.go-version'
+      - '.github/workflows/chapter4-practice.yml'
+  workflow_dispatch: # 手動実行用
+
+# 4.8 Concurrency (多重起動の抑制と古い実行の自動キャンセル)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true # 同一プルリクエストでの連続プッシュ時に古いCIを自動終了してコスト削減
+
+# 4.7.2 デフォルトシェルの設定
+# ワークフロー全体で明示的に指定することで、Bashが「-eo pipefail」オプション付きで起動
+# これによりパイプライン途中のエラーを正しく検知でき、ワークフローの「静かな死」を防ぎます
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ci-verification:
+    name: Run CI Verification
+    runs-on: ubuntu-latest
+    # 4.6 タイムアウトの設定
+    # デフォルトの360分（6時間）放置による課金事故を防ぐため、常に短い時間を明示します
+    timeout-minutes: 5
+
+    steps:
+      # ------------------------------------------------------------------------
+      # ステップ 1: チェックアウト
+      # ------------------------------------------------------------------------
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------------
+      # 4.4 セットアップアクションと言語バージョンファイル・キャッシュ
+      # ------------------------------------------------------------------------
+      - name: 4.4: Setup Go Environment
+        uses: actions/setup-go@v5
+        with:
+          # .go-version ファイルからGoのバージョンを読み込み（一箇所で管理するベストプラクティス）
+          go-version-file: .go-version
+          # setup-go@v5 はデフォルトで依存関係のキャッシュが自動有効化されています
+
+      # ------------------------------------------------------------------------
+      # 4.5 静的解析 (actionlint) の実行
+      # ------------------------------------------------------------------------
+      - name: 4.5: Run actionlint (Static Analysis)
+        run: |
+          echo "=== actionlint によるワークフローファイルの静的解析を実行 ==="
+          # Docker を使用して actionlint を手軽に実行する手法です
+          docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" rhysd/actionlint:latest
+
+      # ------------------------------------------------------------------------
+      # 4.7.1 Bashのパイプエラー検知 (pipefail) の動作検証
+      # ------------------------------------------------------------------------
+      - name: "4.7: Verify Pipefail Behavior"
+        run: |
+          echo "=== パイプ処理エラー検知のテスト ==="
+          # defaultsで「shell: bash」を指定しているため、「-eo pipefail」が効いています。
+          # 意図的に左側でエラーを起こした場合、全体の終了ステータスが非ゼロになり、
+          # ここでステップが即座に失敗することを確認できます。
+          # (テスト実行時は以下行のコメントアウトを外すと、パイプエラー検知の挙動を確認できます)
+          # cat nonexistent-file.txt | grep "test"
+          echo "Pipefail test skipped (uncomment to test failure)"
+
+      # ------------------------------------------------------------------------
+      # 4.2 自動テストの実行
+      # ------------------------------------------------------------------------
+      - name: "4.2: Build and Test (Go)"
+        run: |
+          echo "=== Goの自動テストを実行 ==="
+          # プロダクションコードとテストコードが配置されているディレクトリでテストを実行
+          if [ -d "go/excellent" ]; then
+            go test -v ./go/excellent/...
+          else
+            echo "Warning: go/excellent directory not found. Please prepare target files."
+          fi
