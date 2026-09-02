@@ -11,9 +11,9 @@ on:
     # 4.3.2 Glob パターンによる起動制限
     # Goの関連コード、またはこのワークフロー定義自体が変更されたときのみ起動
     paths:
-      - 'go/**/*.go'
-      - '.go-version'
-      - '.github/workflows/chapter4-practice.yml'
+      - "go/**/*.go"
+      - ".go-version"
+      - ".github/workflows/chapter4.yml"
   workflow_dispatch: # 手動実行用
 
 # 4.8 Concurrency (多重起動の抑制と古い実行の自動キャンセル)
