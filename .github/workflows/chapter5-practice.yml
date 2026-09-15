@@ -1,0 +1,180 @@
+# ==============================================================================
+# 第5章: 運用しやすいワークフローの設計 検証用ワークフロー
+# ==============================================================================
+name: Chapter 5 Practice Workflow
+run-name: Chapter 5 Practice by @${{ github.actor }}
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment-name:
+        description: 'Environment to run'
+        required: false
+        default: 'test'
+        type: environment
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Job 1: ロギング、レポーティング、Environments、データ生成
+  # ----------------------------------------------------------------------------
+  logging-and-reporting:
+    name: 5.2 & 5.3 Logging and Reporting
+    runs-on: ubuntu-latest
+
+    # 5.7 Environments の指定（入力パラメータから動的に切り替え可能）
+    environment: ${{ inputs.environment-name || 'test' }}
+
+    # 5.5.3 ジョブ間のデータ共有（ジョブレベルの出力値定義）
+    outputs:
+      shared_msg: ${{ steps.producer.outputs.custom_msg }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 5.2.1 & 5.2.2 デバッグログとワークフローコマンド
+      - name: "5.2.1 & 5.2.2: Debug Log and Commands"
+        run: |
+          echo "=== デバッグログの出力 ==="
+          echo "::debug::This is a debug message (visible when debug logging is enabled)"
+
+      # 5.2.3 Bashのトレーシングオプション (-x)
+      - name: "5.2.3: Bash Tracing Option"
+        shell: bash
+        run: |
+          set -x # コマンドと展開結果を出力するトレーシング開始
+          echo "Tracing is enabled"
+          FOO="bar"
+          echo "FOO is ${FOO}"
+          set +x # トレーシング終了
+
+      # 5.2.4 ログのグループ化
+      - name: "5.2.4: Log Grouping"
+        run: |
+          echo "::group::Expand to see environment variables"
+          printenv | head -n 10
+          echo "::endgroup::"
+
+      # 5.2.5 ログの手動マスク
+      - name: "5.2.5: Add Mask to Sensitive Log"
+        run: |
+          DYNAMIC_PASSWORD="DynamicSecretValue123"
+          echo "::add-mask::${DYNAMIC_PASSWORD}"
+          echo "Masked password test: ${DYNAMIC_PASSWORD}"
+
+      # 5.3.1 アノテーション出力
+      - name: "5.3.1: Output Annotations"
+        run: |
+          echo "::notice::This is a notice level annotation"
+          echo "::warning::This is a warning level annotation"
+          # echo "::error::This is an error level annotation" # エラーで失敗させないためコメントアウト
+
+      # 5.3.2 ジョブサマリーへのマークダウン出力
+      - name: "5.3.2: Output Job Summary"
+        run: |
+          echo "## Chapter 5 Verification Summary :rocket:" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| Topic | Status |" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| :--- | :--- |" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| Logging & Reporting | Verified |" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| Job Control & Data Sharing | Verified |" >> "${GITHUB_STEP_SUMMARY}"
+
+      # 5.5.3 後続ジョブへ渡すデータの出力（Producerステップ）
+      - name: "5.5.3: Produce Shared Data for Next Job"
+        id: producer
+        run: |
+          echo "custom_msg=Hello_from_Job1" >> "${GITHUB_OUTPUT}"
+
+  # ----------------------------------------------------------------------------
+  # Job 2: 逐次実行 (needs)、ジョブ間データ受け取り、アーティファクト作成
+  # ----------------------------------------------------------------------------
+  job-control-and-artifacts:
+    name: 5.5 & 5.9 Job Control and Artifacts
+    runs-on: ubuntu-latest
+    # 5.5.2 ジョブの逐次実行（Job 1の完了を待つ）
+    needs: [logging-and-reporting]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 5.5.3 別ジョブからのデータ参照 (needs コンテキスト)
+      - name: "5.5.3: Consume Data from Job 1"
+        env:
+          RECEIVED_MSG: ${{ needs.logging-and-reporting.outputs.shared_msg }}
+        run: |
+          echo "=== ジョブ間で共有されたデータ ==="
+          echo "Received Message: ${RECEIVED_MSG}"
+
+      # 5.9.1 アーティファクトの生成とアップロード
+      - name: "5.9.1: Generate and Upload Artifact"
+        run: |
+          mkdir -p build_output
+          date > build_output/timestamp.txt
+          echo "Build result data" > build_output/result.txt
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifact-sample
+          path: build_output/
+          retention-days: 7
+
+  # ----------------------------------------------------------------------------
+  # Job 3: マトリックスビルド、キャッシュ、アーティファクトダウンロード
+  # ----------------------------------------------------------------------------
+  matrix-cache-and-download:
+    name: 5.6 & 5.8 & 5.9 Matrix, Cache, and Download
+    runs-on: ubuntu-latest
+    needs: [job-control-and-artifacts]
+
+    # 5.6 マトリックスと組み合わせ条件の手動定義 (include)
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: '20'
+          - os: ubuntu-latest
+            node: '18'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # 5.8.1 キャッシュアクションによるデータ再利用
+      - name: "5.8.1: Cache Dependencies Example"
+        uses: actions/cache@v4
+        with:
+          key: sample-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/chapter5-practice.yml') }}
+          path: dummy-cache-dir
+          restore-keys: |
+            sample-cache-${{ runner.os }}-
+
+      - name: Generate Cache Content if Missed
+        run: |
+          if [ ! -d "dummy-cache-dir" ]; then
+            echo "Cache miss. Generating dummy cache files..."
+            mkdir -p dummy-cache-dir
+            echo "Cached data content" > dummy-cache-dir/data.txt
+          else
+            echo "Cache hit! Using restored dummy-cache-dir."
+          fi
+
+      # 5.9.2 アーティファクトのダウンロード
+      - name: "5.9.2: Download Artifact from Job 2"
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact-sample
+          path: downloaded_artifacts
+
+      - name: Verify Downloaded Artifact
+        run: |
+          echo "=== ダウンロードしたアーティファクトの確認 ==="
+          cat downloaded_artifacts/timestamp.txt
+          cat downloaded_artifacts/result.txt
